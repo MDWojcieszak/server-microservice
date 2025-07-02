@@ -8,7 +8,7 @@ import { ServerSettingsService } from 'src/server-settings/server-settings.servi
 export class ServerSettingsController {
   constructor(private settingsService: ServerSettingsService) {}
 
-  @EventPattern('set_setting')
+  @EventPattern('setting.set')
   async setSettings(dto: SetSettingDto) {
     const errors = await validate(dto);
 

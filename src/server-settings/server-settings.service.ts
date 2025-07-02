@@ -30,7 +30,7 @@ export class ServerSettingsService {
     }
   }
 
-  getMinecrsftServerSettings() {
+  getMinecraftServerSettings() {
     return this.serverSettings[ServerCategory.MINECRAFT_SERVER];
   }
 
