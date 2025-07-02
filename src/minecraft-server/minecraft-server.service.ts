@@ -24,7 +24,7 @@ export class MinecraftServerService {
   private processId: string;
 
   async handleStartServer(dto: StartServerDto) {
-    const settings = this.serverSettings.getMinecrsftServerSettings();
+    const settings = this.serverSettings.getMinecraftServerSettings();
     const res = await this.processService.registerProcess(
       dto.context.categoryId,
       dto.context.userId,
