@@ -36,7 +36,7 @@ export class SystemRegisterService {
       const cpu = await this.systemUsage.getCpuInfo();
       await firstValueFrom(
         this.hubClient.send(
-          'register-server',
+          'server.register',
           new RegisterServerEvent(serverName, ipAddress, diskCount, cpu),
         ),
       );
@@ -44,7 +44,7 @@ export class SystemRegisterService {
       await this.handleSettingsRegistration(serverName);
       this.eventEmmiter.emit('system.registered');
     } catch (e) {
-      Logger.error('REGISTRATION FAILED');
+      Logger.error('REGISTRATION FAILED', e);
     }
   }
 
@@ -55,12 +55,12 @@ export class SystemRegisterService {
 
       await firstValueFrom(
         this.hubClient.send(
-          'register-commands',
+          'commands.register',
           new RegisterServerCommandsEvent(serverName, commands),
         ),
       );
     } catch (e) {
-      Logger.error('COMMAND_REGISTRATION_FAILED');
+      Logger.error('COMMAND_REGISTRATION_FAILED', e);
     }
   }
 
@@ -84,12 +84,12 @@ export class SystemRegisterService {
       }
       await firstValueFrom(
         this.hubClient.send(
-          'register-settings',
+          'settings.register',
           new RegisterServerSettingsEvent(serverName, settingsTable),
         ),
       );
     } catch (e) {
-      Logger.error('SETTINGS_REGISTRATION_FAILED');
+      Logger.error('SETTINGS_REGISTRATION_FAILED', e);
     }
   }
 
