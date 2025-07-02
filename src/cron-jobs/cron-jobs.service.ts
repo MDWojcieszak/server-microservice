@@ -20,7 +20,7 @@ export class CronJobsService {
     this.isRegistered = true;
   }
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async handleLoad() {
     try {
       const serverName = this.config.get<string>('SERVER_NAME');
@@ -31,23 +31,29 @@ export class CronJobsService {
   }
 
   async handleLoadRaport(serverName: string) {
-    if (!this.isRegistered) return;
-    Logger.log('LOAD RAPORT');
+    try {
+      if (!this.isRegistered) return;
+      Logger.log('LOAD RAPORT');
 
-    const systemLoad = await this.systemUsage.getSystemLoad();
-    const uptime = await this.systemUsage.getSystemUptime();
-    console.log(
-      await firstValueFrom(
-        this.hubClient.send('raport-server-usage', {
-          cpu: systemLoad,
-          uptime,
-          name: serverName,
-        }),
-      ),
-    );
+      const systemLoad = await this.systemUsage.getSystemLoad();
+      const uptime = await this.systemUsage.getSystemUptime();
+      console.log(
+        await firstValueFrom(
+          this.hubClient.send('server.raport-usage', {
+            properties: {
+              cpuInfo: systemLoad,
+              uptime,
+            },
+            name: serverName,
+          }),
+        ),
+      );
+    } catch (e) {
+      Logger.error('Failed to send load report', e);
+    }
   }
 
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS)
   async handleMemory() {
     try {
       const serverName = this.config.get<string>('SERVER_NAME');
@@ -59,18 +65,22 @@ export class CronJobsService {
   }
 
   async handleMemoryRaport(serverName: string) {
-    if (!this.isRegistered) return;
-    Logger.log('MEMORY RAPORT');
+    try {
+      if (!this.isRegistered) return;
+      Logger.log('MEMORY RAPORT');
 
-    const memoryInfo = await this.systemUsage.getMemoryInfo();
-    console.log(
-      await firstValueFrom(
-        this.hubClient.send('raport-server-usage', {
-          memory: memoryInfo,
-          name: serverName,
-        }),
-      ),
-    );
+      const memoryInfo = await this.systemUsage.getMemoryInfo();
+      console.log(
+        await firstValueFrom(
+          this.hubClient.send('server.raport-usage', {
+            properties: { memoryInfo },
+            name: serverName,
+          }),
+        ),
+      );
+    } catch (e) {
+      Logger.error('Failed to send memory report', e);
+    }
   }
 
   @Cron(CronExpression.EVERY_10_MINUTES)
@@ -85,17 +95,38 @@ export class CronJobsService {
   }
 
   async handleDiskRaport(serverName: string) {
-    if (!this.isRegistered) return;
-    Logger.log('DISK RAPORT');
+    try {
+      if (!this.isRegistered) return;
+      Logger.log('DISK RAPORT');
 
-    const diskInfo = await this.systemUsage.getDiskInfo();
-    console.log(
+      const diskInfo = await this.systemUsage.getDiskInfo();
+      console.log(
+        await firstValueFrom(
+          this.hubClient.send('server.raport-usage', {
+            properties: { diskInfo },
+            name: serverName,
+          }),
+        ),
+      );
+    } catch (e) {
+      Logger.error('Failed to send disk report', e);
+    }
+  }
+
+  @Cron(CronExpression.EVERY_5_SECONDS)
+  async sendHeartbeat() {
+    try {
+      if (!this.isRegistered) return;
+
+      const serverName = this.config.get<string>('SERVER_NAME');
+      Logger.debug(`Sending heartbeat for ${serverName}`);
       await firstValueFrom(
-        this.hubClient.send('raport-server-usage', {
-          disk: diskInfo,
+        this.hubClient.emit('server.heartbeat', {
           name: serverName,
         }),
-      ),
-    );
+      );
+    } catch (e) {
+      Logger.error('Failed to send heartbeat', e);
+    }
   }
 }
