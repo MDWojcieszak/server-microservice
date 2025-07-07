@@ -9,6 +9,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CommandModule } from 'src/command/command.module';
 import { ServerSettingsModule } from './server-settings/server-settings.module';
 import { ProcessModule } from './process/process.module';
+import { SystemPowerModule } from 'src/system-power/system-power.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ProcessModule } from './process/process.module';
     SystemUsageModule,
     CronJobsModule,
     SystemRegisterModule,
+    SystemPowerModule,
     CommandModule,
     ServerSettingsModule,
     ProcessModule,

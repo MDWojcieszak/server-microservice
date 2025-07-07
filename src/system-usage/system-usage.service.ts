@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { PublicNetworkInfo } from 'src/common/types';
 import * as si from 'systeminformation';
 
 @Injectable()
@@ -55,31 +56,30 @@ export class SystemUsageService {
     }
   }
 
-  async getPublicIP() {
+  async getPublicNetworkInfo(): Promise<PublicNetworkInfo> {
     try {
       const networkInterfaces = await si.networkInterfaces();
-      let publicInterface: si.Systeminformation.NetworkInterfacesData = null;
+
+      let publicInterface:
+        | si.Systeminformation.NetworkInterfacesData
+        | undefined;
 
       if (Array.isArray(networkInterfaces)) {
-        publicInterface = networkInterfaces.find((i) => {
-          return i.ip4 && i.ip4 !== '127.0.0.1' && i.ip4 !== '::1';
-        });
-      } else if (
-        networkInterfaces &&
-        networkInterfaces.ip4 &&
-        networkInterfaces.ip4 !== '127.0.0.1' &&
-        networkInterfaces.ip4 !== '::1'
-      ) {
-        publicInterface = networkInterfaces;
+        publicInterface = networkInterfaces.find(
+          (i) => i.ip4 && i.ip4 !== '127.0.0.1' && i.ip4 !== '::1',
+        );
       }
 
-      if (publicInterface) {
-        return publicInterface.ip4;
-      } else {
-        throw new Error('Public IP address not found.');
+      if (!publicInterface) {
+        throw new Error('Public network interface not found.');
       }
+
+      return {
+        ip: publicInterface.ip4,
+        mac: publicInterface.mac,
+      };
     } catch (error) {
-      throw new Error(error);
+      throw new Error(`Failed to get public network info: ${error.message}`);
     }
   }
 }
