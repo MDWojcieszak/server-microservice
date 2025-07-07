@@ -32,12 +32,18 @@ export class SystemRegisterService {
 
       Logger.log('SERVER REGISTRATION');
       const diskCount = (await this.systemUsage.getDiskInfo()).length;
-      const ipAddress = await this.systemUsage.getPublicIP();
+      const networkInfo = await this.systemUsage.getPublicNetworkInfo();
       const cpu = await this.systemUsage.getCpuInfo();
       await firstValueFrom(
         this.hubClient.send(
           'server.register',
-          new RegisterServerEvent(serverName, ipAddress, diskCount, cpu),
+          new RegisterServerEvent(
+            serverName,
+            networkInfo.ip,
+            networkInfo.mac,
+            diskCount,
+            cpu,
+          ),
         ),
       );
       await this.handleCommandRegistration(serverName);
