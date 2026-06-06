@@ -1,7 +1,7 @@
 export const config = () => ({
   rabbitMQConfig: {
     urls: [process.env.RABBITMQ_URL],
-    queue: process.env.MAIN_QUEUE,
+    queue: `AGENT.${process.env.SERVER_NAME}`,
     queueOptions: {
       durable: true,
     },

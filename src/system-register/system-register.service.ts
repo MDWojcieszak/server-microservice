@@ -4,7 +4,6 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
 import { CommandCollectorSerice } from 'src/command/command-collector.service';
-import { ServerStatus } from 'src/common/enums';
 import { ServerSettingsService } from 'src/server-settings/server-settings.service';
 import {
   RegisterServerCommandsEvent,
@@ -29,6 +28,7 @@ export class SystemRegisterService {
   async handleRegistration() {
     try {
       const serverName = this.config.get<string>('SERVER_NAME');
+      const queueName = `AGENT.${serverName}`;
 
       Logger.log('SERVER REGISTRATION');
       const diskCount = (await this.systemUsage.getDiskInfo()).length;
@@ -42,6 +42,7 @@ export class SystemRegisterService {
             networkInfo.ip,
             networkInfo.mac,
             diskCount,
+            queueName,
             cpu,
           ),
         ),

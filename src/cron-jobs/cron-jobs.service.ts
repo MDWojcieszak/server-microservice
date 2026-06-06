@@ -8,12 +8,14 @@ import { SystemUsageService } from 'src/system-usage/system-usage.service';
 
 @Injectable()
 export class CronJobsService {
+  private readonly logger = new Logger(CronJobsService.name);
+  private isRegistered = false;
+
   constructor(
     @Inject('HUB') private hubClient: ClientProxy,
     private systemUsage: SystemUsageService,
     private config: ConfigService,
   ) {}
-  private isRegistered = false;
 
   @OnEvent('system.registered')
   handleSystemRegistered() {
@@ -22,111 +24,64 @@ export class CronJobsService {
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async handleLoad() {
+    if (!this.isRegistered) return;
     try {
-      const serverName = this.config.get<string>('SERVER_NAME');
-      await this.handleLoadRaport(serverName);
-    } catch (error) {
-      console.error('Error executing cron job:', error);
-    }
-  }
-
-  async handleLoadRaport(serverName: string) {
-    try {
-      if (!this.isRegistered) return;
-      Logger.log('LOAD RAPORT');
-
-      const systemLoad = await this.systemUsage.getSystemLoad();
+      const cpuInfo = await this.systemUsage.getSystemLoad();
       const uptime = await this.systemUsage.getSystemUptime();
-      console.log(
-        await firstValueFrom(
-          this.hubClient.send('server.raport-usage', {
-            properties: {
-              cpuInfo: systemLoad,
-              uptime,
-            },
-            name: serverName,
-          }),
-        ),
+      await firstValueFrom(
+        this.hubClient.send('server.raport-usage', {
+          name: this.config.get<string>('SERVER_NAME'),
+          properties: { cpuInfo, uptime },
+        }),
       );
     } catch (e) {
-      Logger.error('Failed to send load report', e);
+      this.logger.error('Failed to send load report', e);
     }
   }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
   async handleMemory() {
+    if (!this.isRegistered) return;
     try {
-      const serverName = this.config.get<string>('SERVER_NAME');
-      if (!this.isRegistered) return;
-      this.handleMemoryRaport(serverName);
-    } catch (error) {
-      console.error('Error executing cron job:', error);
-    }
-  }
-
-  async handleMemoryRaport(serverName: string) {
-    try {
-      if (!this.isRegistered) return;
-      Logger.log('MEMORY RAPORT');
-
       const memoryInfo = await this.systemUsage.getMemoryInfo();
-      console.log(
-        await firstValueFrom(
-          this.hubClient.send('server.raport-usage', {
-            properties: { memoryInfo },
-            name: serverName,
-          }),
-        ),
+      await firstValueFrom(
+        this.hubClient.send('server.raport-usage', {
+          name: this.config.get<string>('SERVER_NAME'),
+          properties: { memoryInfo },
+        }),
       );
     } catch (e) {
-      Logger.error('Failed to send memory report', e);
+      this.logger.error('Failed to send memory report', e);
     }
   }
 
   @Cron(CronExpression.EVERY_10_MINUTES)
   async handleDisk() {
+    if (!this.isRegistered) return;
     try {
-      const serverName = this.config.get<string>('SERVER_NAME');
-      if (!this.isRegistered) return;
-      this.handleDiskRaport(serverName);
-    } catch (error) {
-      console.error('Error executing cron job:', error);
-    }
-  }
-
-  async handleDiskRaport(serverName: string) {
-    try {
-      if (!this.isRegistered) return;
-      Logger.log('DISK RAPORT');
-
       const diskInfo = await this.systemUsage.getDiskInfo();
-      console.log(
-        await firstValueFrom(
-          this.hubClient.send('server.raport-usage', {
-            properties: { diskInfo },
-            name: serverName,
-          }),
-        ),
+      await firstValueFrom(
+        this.hubClient.send('server.raport-usage', {
+          name: this.config.get<string>('SERVER_NAME'),
+          properties: { diskInfo },
+        }),
       );
     } catch (e) {
-      Logger.error('Failed to send disk report', e);
+      this.logger.error('Failed to send disk report', e);
     }
   }
 
   @Cron(CronExpression.EVERY_5_SECONDS)
   async sendHeartbeat() {
+    if (!this.isRegistered) return;
     try {
-      if (!this.isRegistered) return;
-
-      const serverName = this.config.get<string>('SERVER_NAME');
-      Logger.debug(`Sending heartbeat for ${serverName}`);
       await firstValueFrom(
         this.hubClient.emit('server.heartbeat', {
-          name: serverName,
+          name: this.config.get<string>('SERVER_NAME'),
         }),
       );
     } catch (e) {
-      Logger.error('Failed to send heartbeat', e);
+      this.logger.error('Failed to send heartbeat', e);
     }
   }
 }

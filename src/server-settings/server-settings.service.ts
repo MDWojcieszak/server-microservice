@@ -1,15 +1,11 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ClientProxy } from '@nestjs/microservices';
 import { MinecraftServerConfig, ServerCategory } from 'src/common/enums';
 import { SetSettingDto } from 'src/server-settings/dto';
 
 @Injectable()
 export class ServerSettingsService {
-  constructor(
-    @Inject('HUB') private hubClient: ClientProxy,
-    private config: ConfigService,
-  ) {}
+  constructor(private config: ConfigService) {}
   private serverSettings = {
     [ServerCategory.MINECRAFT_SERVER]: {
       [MinecraftServerConfig.MAX_MEMORY]: 1024,
@@ -19,7 +15,6 @@ export class ServerSettingsService {
 
   handleSetSettings(dto: SetSettingDto) {
     if (this.config.get<string>('SERVER_NAME') !== dto.serverName) return;
-    console.log(dto);
     const type = typeof this.serverSettings[dto.category][dto.name];
     if (type === 'undefined')
       throw new ForbiddenException('Setting does not exist!');

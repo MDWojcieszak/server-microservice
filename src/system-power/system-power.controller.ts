@@ -1,19 +1,28 @@
-import { Controller, Post } from '@nestjs/common';
+import { Controller, Logger } from '@nestjs/common';
 import { SystemPowerService } from './system-power.service';
-import { MessagePattern } from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { PowerServerDto } from './dto';
 
 @Controller('system/power')
 export class SystemPowerController {
+  private readonly logger = new Logger(SystemPowerController.name);
+
   constructor(private readonly powerService: SystemPowerService) {}
 
-  @MessagePattern('system.shutdown')
-  async handleShutdown() {
+  // Backend -> Server (channel: server.shutdown, PowerServerEvent)
+  @MessagePattern('server.shutdown')
+  async handleShutdown(@Payload() event: PowerServerDto) {
+    this.logger.log(
+      `Shutdown requested for server ${event?.context?.serverId}`,
+    );
     await this.powerService.shutdown();
     return { status: 'shutdown initiated' };
   }
 
-  @MessagePattern('system.reboot')
-  async handleReboot() {
+  // Backend -> Server (channel: server.reboot, PowerServerEvent)
+  @MessagePattern('server.reboot')
+  async handleReboot(@Payload() event: PowerServerDto) {
+    this.logger.log(`Reboot requested for server ${event?.context?.serverId}`);
     await this.powerService.reboot();
     return { status: 'reboot initiated' };
   }

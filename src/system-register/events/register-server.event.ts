@@ -6,6 +6,7 @@ export class RegisterServerEvent {
     public readonly ipAddress: string,
     public readonly macAddress: string,
     public readonly diskCount: number,
+    public readonly queueName: string,
     public readonly cpu: Systeminformation.CpuData,
   ) {}
 }

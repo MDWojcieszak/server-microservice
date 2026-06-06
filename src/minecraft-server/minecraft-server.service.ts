@@ -1,20 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { createWriteStream } from 'fs';
 import { SendCommandDto, StartServerDto } from './dto';
 
 import { ServerSettingsService } from 'src/server-settings/server-settings.service';
-import {
-  CommandStatus,
-  LogLevel,
-  ProcessStatus,
-  ServerCategory,
-} from 'src/common/enums';
-import { StopServerDto } from 'src/minecraft-server/dto/stop-server.dto';
+import { LogLevel, ProcessStatus, ServerCategory } from 'src/common/enums';
 import { ProcessService } from 'src/process/process.service';
 
 @Injectable()
 export class MinecraftServerService {
+  private readonly logger = new Logger(MinecraftServerService.name);
+
   constructor(
     private serverSettings: ServerSettingsService,
     private processService: ProcessService,
@@ -24,30 +20,58 @@ export class MinecraftServerService {
   private processId: string;
 
   async handleStartServer(dto: StartServerDto) {
+    this.logger.log(
+      `Start requested (user=${dto.context.userId}, category=${dto.context.categoryId})`,
+    );
     const settings = this.serverSettings.getMinecraftServerSettings();
     const res = await this.processService.registerProcess(
       dto.context.categoryId,
       dto.context.userId,
       ServerCategory.MINECRAFT_SERVER,
+      'server.start',
     );
 
-    if (!res) return false;
-    if (this.minecraftServerProcess && !this.minecraftServerProcess.killed)
+    if (!res) {
+      this.logger.error('Start aborted: process registration failed');
       return false;
+    }
+    if (this.isRunning()) {
+      this.logger.warn('Start ignored: server is already running');
+      this.processService.postStatus(res, ProcessStatus.FAILED);
+      return false;
+    }
 
     try {
       this.processId = res;
-      this.createProcess(settings.min_memory, settings.min_memory);
+      this.logger.log(
+        `Spawning Minecraft server (process=${res}, memory=${settings.min_memory}-${settings.max_memory}MB)`,
+      );
+      this.createProcess(settings.min_memory, settings.max_memory);
       const logStream = createWriteStream('server.log', { flags: 'a' });
       this.minecraftServerProcess.stdout.pipe(logStream);
       this.minecraftServerProcess.stderr.pipe(logStream);
       this.setupListeners();
       this.processService.postStatus(res, ProcessStatus.STARTED);
+      this.logger.log(
+        `Minecraft server started (pid=${this.minecraftServerProcess.pid})`,
+      );
       return true;
     } catch (e) {
+      this.logger.error(`Failed to start Minecraft server (process=${res})`, e);
       this.processService.postStatus(res, ProcessStatus.FAILED);
       return false;
     }
+  }
+
+  // A child process exposes a null exitCode/signalCode only while it is alive;
+  // `killed` flips to true only on an explicit .kill(), so it cannot detect a
+  // process that ended on its own (stop command, crash, natural exit).
+  isRunning(): boolean {
+    return (
+      !!this.minecraftServerProcess &&
+      this.minecraftServerProcess.exitCode === null &&
+      this.minecraftServerProcess.signalCode === null
+    );
   }
 
   createProcess(minMemory: number, maxMemory: number) {
@@ -58,7 +82,7 @@ export class MinecraftServerService {
     );
   }
 
-  handleStopServer(dto: StopServerDto) {
+  handleStopServer() {
     try {
       if (this.minecraftServerProcess) {
         this.sendCommandToMinecraftServer({ command: 'stop' });
@@ -78,7 +102,7 @@ export class MinecraftServerService {
     if (this.minecraftServerProcess && !this.minecraftServerProcess.killed) {
       this.minecraftServerProcess.stdin.write(`${dto.command}\n`);
     } else {
-      console.error('Minecraft server process is not running.');
+      this.logger.error('Minecraft server process is not running.');
     }
   }
 
@@ -90,12 +114,21 @@ export class MinecraftServerService {
         ProcessStatus.FAILED,
       );
     }
-    this.minecraftServerProcess.on('error', (code) => {
+    this.minecraftServerProcess.on('error', () => {
       this.killProcess();
       return this.processService.postStatus(
         this.processId,
         ProcessStatus.FAILED,
       );
+    });
+
+    // Authoritative lifecycle signal: clear the reference so a new server can
+    // be started once the current process has fully exited.
+    this.minecraftServerProcess.on('exit', (code, signal) => {
+      this.logger.log(
+        `Minecraft server exited (code=${code}, signal=${signal})`,
+      );
+      this.minecraftServerProcess = null;
     });
     this.minecraftServerProcess.stdout.on('data', (data) => {
       return this.processMessage(data.toString());
@@ -117,61 +150,9 @@ export class MinecraftServerService {
   }
 
   processMessage(message: string) {
-    let startServerProgress = undefined;
-    let stopServerProgress = undefined;
-    if (message.match(/[M,m]odLauncher running: args[^x]*/)) {
-      startServerProgress = 5;
-    }
-    if (message.match(/Environment/)) {
-      startServerProgress = 15;
-    }
-    if (message.match(/Starting version check at/)) {
-      startServerProgress = 40;
-    }
-    if (message.match(/Reloading ResourceManager/)) {
-      startServerProgress = 45;
-    }
-    if (message.match(/Starting Minecraft/)) {
-      startServerProgress = 50;
-    }
-    if (message.match(/Generating keypair/)) {
-      startServerProgress = 60;
-    }
-    if (message.match(/Using epoll channel type/)) {
-      startServerProgress = 70;
-    }
-    if (message.match(/Preparing level world/)) {
-      startServerProgress = 80;
-    }
-    if (message.match(/Preparing spawn area/)) {
-      startServerProgress = 90;
-    }
-    if (message.match(/[D,d]one[^x]*For help, type help/)) {
-      startServerProgress = 100;
-    }
-    if (message.match(/Stopping the server/)) {
-      stopServerProgress = 5;
-    }
-    if (message.match(/Saving chunks for level/)) {
-      stopServerProgress = 50;
-    }
-    if (message.match(/ThreadedAnvilChunkStorage \(DIM1\)/)) {
-      stopServerProgress = 100;
-    }
-    if (startServerProgress !== undefined) {
-      this.processService.postCommandStatus(
-        'server.start',
-        ServerCategory.MINECRAFT_SERVER,
-        startServerProgress,
-      );
-    }
-    if (stopServerProgress !== undefined) {
-      this.processService.postCommandStatus(
-        'server.stop',
-        ServerCategory.MINECRAFT_SERVER,
-        stopServerProgress,
-      );
-    }
+    // Raw console lines are streamed to the backend via process.register-log.
+    // The backend derives command progress/status from its configured markers,
+    // so the agent does not compute percentages here.
     let level = LogLevel.LOG;
     if (message.includes('\u001b[32m')) {
       message = message.replace('\u001b[32m', '');
@@ -191,7 +172,7 @@ export class MinecraftServerService {
   }
 
   killProcess() {
-    if (this.minecraftServerProcess && !this.minecraftServerProcess.killed)
+    if (!this.minecraftServerProcess || this.minecraftServerProcess.killed)
       return;
     this.minecraftServerProcess.kill();
   }

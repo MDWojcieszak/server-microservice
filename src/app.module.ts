@@ -10,6 +10,7 @@ import { CommandModule } from 'src/command/command.module';
 import { ServerSettingsModule } from './server-settings/server-settings.module';
 import { ProcessModule } from './process/process.module';
 import { SystemPowerModule } from 'src/system-power/system-power.module';
+import { ServerTransferModule } from './server-transfer/server-transfer.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { SystemPowerModule } from 'src/system-power/system-power.module';
     CommandModule,
     ServerSettingsModule,
     ProcessModule,
+    ServerTransferModule,
   ],
 })
 export class AppModule {}

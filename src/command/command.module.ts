@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DiscoveryModule, MetadataScanner } from '@nestjs/core';
+import { DiscoveryModule } from '@nestjs/core';
 import { CommandCollectorSerice } from 'src/command/command-collector.service';
 
 @Module({
